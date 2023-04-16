@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "async-file-service"
+version = "0.1.0"
+description = ""
+authors = ["Sergei Klimov <s.klimov@bk.ru>"]
+readme = "README.md"
+packages = [{include = "async_file_service"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+aiohttp = "^3.8.4"
+aiofiles = "^23.1.0"
+configargparse = "^1.5.3"
+
+[tool.poetry.dev-dependencies]
+flake8 = "^6.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
