@@ -16,26 +16,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SAVE_FILE_HOST = 'http://localhost:8080'
-SAVE_FILE_URL = '/archive/save/'
-CHUNK_SIZE = 2 ** 16
-FILE_NAME = 'test_photos/7kna/2.jpg'
+CHUNK_SIZE = 2 ** 16  # Размер порции файла для считывания в ОЗУ, в байтах
 
 
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
-    parser = configargparse.ArgParser(default_config_files=['.env', ], ignore_unknown_config_file_keys=True)
+    parser = configargparse.ArgParser()
 
-    parser.add('--protocol', type=str, required=True, choices=['http', 'https'],
+    parser.add('--protocol', type=str, required=False, choices=['http', 'https'], default='http',
                help='Протокол файлового сервера')
-    parser.add('--host', type=str, required=True,
+    parser.add('--host', type=str, required=False, default='localhost',
                help='Хост файлового сервера')
-    parser.add('--port', type=int, required=True,
+    parser.add('--port', type=int, required=False, default='8080',
                help='Порт файлового сервера')
-    parser.add('--url', type=str, required=True,
+    parser.add('--url', type=str, required=False, default='files/',
                help='Урл для доступа к методу сохранения файла')
-    parser.add('--chunk_size', type=int, required=True,
+    parser.add('--chunk_size', type=int, required=False, default=CHUNK_SIZE,
                help='Размер порции файла для считывания в ОЗУ, в байтах')
     parser.add('--path', type=str, required=True,
                help='Файл для сохранения в файловом сервисе')
@@ -68,7 +65,7 @@ async def main():
         async with session.post(
                 url,
                 headers=headers,
-                data=file_sender(file_name=FILE_NAME, chunk_size=args.chunk_size)
+                data=file_sender(file_name=args.path, chunk_size=args.chunk_size)
         ) as resp:
             logger.info(await resp.text())
 
