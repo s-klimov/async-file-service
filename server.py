@@ -92,11 +92,13 @@ async def get_file(request: Request) -> web.StreamResponse:
         raise web.HTTPNotFound(text='Архив не существует или был удален')
 
     async with engine.connect() as conn:
-        file_rows = await conn.execute(select(files).where(files.id == file_id))  # FIXME
+        statement = select(files.c.id, files.c.name).where(files.c.id == file_id)
+
+        file_rows = await conn.execute(statement)
         if file_rows is None:
             raise web.HTTPNotFound(text='Файла по указанному id не существует')
-        file_name = file_rows[0].name
-        file_path = os.path.join(app['archive_dir'], file_rows[0].id)
+        file_name = file_rows.fetchone().name
+        file_path = os.path.join(app['archive_dir'], file_id)
 
     response = web.StreamResponse(
         status=200,
