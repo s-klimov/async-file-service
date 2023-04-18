@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+from typing import Generator
 from urllib.parse import urljoin
 
 import aiofiles
@@ -40,8 +41,16 @@ def get_args() -> configargparse.Namespace:
     return parser.parse_args()
 
 
-async def file_sender(file_name: str, chunk_size: int):
-    """Генератор считывания файла по частям"""
+async def file_sender(file_name: str, chunk_size: int) -> Generator[bytes, None, None]:
+    """
+    Генератор считывания файла по частям
+
+            Параметры:
+                    file_name (int): имя файла, включая путь
+                    chunk_size (int): размер порции для считывания файла в память
+            Возвращаемое значение:
+                    chunk (bytes): часть байтового потока файла
+    """
 
     async with aiofiles.open(file_name, 'rb') as f:
         chunk = await f.read(chunk_size)
@@ -51,7 +60,7 @@ async def file_sender(file_name: str, chunk_size: int):
             chunk = await f.read(chunk_size)
 
 
-async def main():
+async def main() -> None:
     """Функция генерации post-запроса в адрес файлового сервиса"""
 
     args = get_args()
