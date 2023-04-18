@@ -1,7 +1,6 @@
 import asyncio
-import logging
+import logging.config
 import os
-import sys
 from typing import Generator
 from urllib.parse import urljoin
 
@@ -9,12 +8,7 @@ import aiofiles
 import aiohttp
 import configargparse as configargparse
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="[%(asctime)s] %(levelname)s %(message)s",
-    datefmt="%d/%b/%Y %H:%M:%S",
-    stream=sys.stdout
-)
+logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 2 ** 16  # Размер порции файла для считывания в ОЗУ, в байтах
@@ -46,7 +40,7 @@ async def file_sender(file_name: str, chunk_size: int) -> Generator[bytes, None,
     Генератор считывания файла по частям
 
             Параметры:
-                    file_name (int): имя файла, включая путь
+                    file_name (str): имя файла, включая путь
                     chunk_size (int): размер порции для считывания файла в память
             Возвращаемое значение:
                     chunk (bytes): часть байтового потока файла

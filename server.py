@@ -1,28 +1,18 @@
 import asyncio
 import cgi
-import logging
+import logging.config
 import os
-import sys
 import uuid
 
 import aiofiles
-
 import configargparse
-
+import sqlalchemy
 from aiohttp import web
 from aiohttp.web_request import Request
-
-import sqlalchemy
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="[%(asctime)s] %(levelname)s %(message)s",
-    datefmt="%d/%b/%Y %H:%M:%S",
-    stream=sys.stdout
-)
+logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 
 metadata = sqlalchemy.MetaData()
@@ -38,26 +28,31 @@ files = sqlalchemy.Table(
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
-    parser = configargparse.ArgParser(default_config_files=['.env'])
+    parser = configargparse.ArgParser(default_config_files=['settings.ini'])
 
     parser.add('--host', type=str, required=False, default='localhost',
                help='Хост файлового сервера')
     parser.add('--port', type=int, required=False, default='8080',
                help='Порт файлового сервера')
-    parser.add('--level', type=str, required=False, choices=['debug', 'info', 'warning'], default='debug',
-               help='Уровень логирования сообщений в консоль')
     parser.add('--archive_dir', type=str, required=True,
                help='Папка для хранения файлов в сервисе')
     parser.add('--database_url', type=str, required=True,
                help='адрес базы данных сервиса')
-    parser.add('--chunk', type=str, required=True,
+    parser.add('--chunk', type=int, required=True,
                help='размер порции файла для выгрузки из сервиса')
 
     return parser.parse_args()
 
 
 async def save_file(request: Request) -> web.Response:
-    """Хендлер сохранения байтового потока из запроса в файл"""
+    """
+    Хендлер сохранения байтового потока из http-запроса в файл
+
+            Параметры:
+                    request (aiohttp.web_request): объект http-запроса
+            Возвращаемое значение:
+                    response (aiohttp.Response): объект ответа
+    """
 
     logger.info(request.headers)
 
@@ -82,7 +77,14 @@ async def save_file(request: Request) -> web.Response:
 
 
 async def get_file(request: Request) -> web.StreamResponse:
-    """Хендлер формирования архива и скачивания его в файл"""
+    """
+    Хендлер формирования архива и скачивания его в файл
+
+            Параметры:
+                    request (aiohttp.web_request): объект http-запроса
+            Возвращаемое значение:
+                    response (aiohttp.StreamResponse): объект ответа в виде байтового потока
+    """
 
     file_id = request.match_info['id']
     folder_path = os.path.join(os.getcwd(), app['archive_dir'])
@@ -95,9 +97,10 @@ async def get_file(request: Request) -> web.StreamResponse:
         statement = select(files.c.id, files.c.name).where(files.c.id == file_id)
 
         file_rows = await conn.execute(statement)
-        if file_rows is None:
+        file = file_rows.fetchone()
+
+        if file is None:
             raise web.HTTPNotFound(text='Файла по указанному id не существует')
-        file_name = file_rows.fetchone().name
         file_path = os.path.join(app['archive_dir'], file_id)
 
     response = web.StreamResponse(
@@ -105,21 +108,20 @@ async def get_file(request: Request) -> web.StreamResponse:
         reason='OK',
         headers={
             'Content-Type': 'multipart/x-mixed-replace',
-            'CONTENT-DISPOSITION': f'attachment;filename={file_name}'
+            'CONTENT-DISPOSITION': f'attachment;filename={file.name}'
         }
     )
 
     # Отправляет клиенту HTTP заголовки
     await response.prepare(request)
 
-    chunk_size = 65_536
     try:
         async with aiofiles.open(file_path, 'rb') as f:
-            chunk = await f.read(chunk_size)
+            chunk = await f.read(app['chunk_size'])
 
             while chunk:
                 await response.write(chunk)
-                chunk = await f.read(chunk_size)
+                chunk = await f.read(app['chunk_size'])
 
     except asyncio.CancelledError:
         logger.error("Download was interrupted ")
@@ -130,34 +132,41 @@ async def get_file(request: Request) -> web.StreamResponse:
     return response
 
 
-async def main():
+async def get_db_engine(database_url: str):
+    """
+    Подключает движок базы данных и создает таблицу для хранения информации о файлах
 
-    # Запускаем базу данных
+            Параметры:
+                    database_url (str): адрес базы данных
+            Возвращаемое значение:
+                    None
+    """
+
     global engine
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=True)
+    engine = create_async_engine(database_url, echo=True)
     async with engine.begin() as conn:
         await conn.run_sync(metadata.create_all)
 
 
 if __name__ == "__main__":
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
-
     args = get_args()
+
     app = web.Application()
-
     app['archive_dir'] = args.archive_dir
-    app['database_url'] = args.database_url
-
-    logger.setLevel(getattr(logging, args.level.upper()))
+    app['chunk_size'] = args.chunk
     app.add_routes([
         web.get('/files/{id}/', get_file),
         web.post('/files/', save_file)
     ])
-    web.run_app(app)
+
+    try:
+        asyncio.run(get_db_engine(args.database_url))
+        web.run_app(app)
+
+    except KeyboardInterrupt:
+        pass
+    except ValueError as e:
+        logger.error(str(e))
+    finally:
+        logger.info('Работа сервера остановлена')
