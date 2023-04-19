@@ -31,9 +31,9 @@ def get_args() -> configargparse.Namespace:
     parser = configargparse.ArgParser(default_config_files=['settings.ini'])
 
     parser.add('--host', type=str, required=False, default='localhost',
-               help='Хост файлового сервера')
+               help='Хост файлового сервера (default: %(default)s)')
     parser.add('--port', type=int, required=False, default='8080',
-               help='Порт файлового сервера')
+               help='Порт файлового сервера (default: %(default)s)')
     parser.add('--archive_dir', type=str, required=True,
                help='Папка для хранения файлов в сервисе')
     parser.add('--database_url', type=str, required=True,
@@ -162,7 +162,7 @@ if __name__ == "__main__":
 
     try:
         asyncio.run(get_db_engine(args.database_url))
-        web.run_app(app)
+        web.run_app(app, host=args.host, port=args.port)
 
     except KeyboardInterrupt:
         pass

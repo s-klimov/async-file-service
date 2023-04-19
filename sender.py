@@ -20,15 +20,15 @@ def get_args() -> configargparse.Namespace:
     parser = configargparse.ArgParser()
 
     parser.add('--protocol', type=str, required=False, choices=['http', 'https'], default='http',
-               help='Протокол файлового сервера')
+               help='Протокол файлового сервера (default: %(default)s)')
     parser.add('--host', type=str, required=False, default='localhost',
-               help='Хост файлового сервера')
+               help='Хост файлового сервера (default: %(default)s)')
     parser.add('--port', type=int, required=False, default='8080',
-               help='Порт файлового сервера')
+               help='Порт файлового сервера (default: %(default)s)')
     parser.add('--url', type=str, required=False, default='files/',
-               help='Урл для доступа к методу сохранения файла')
+               help='Урл для доступа к методу сохранения файла (default: %(default)s)')
     parser.add('--chunk_size', type=int, required=False, default=CHUNK_SIZE,
-               help='Размер порции файла для считывания в ОЗУ, в байтах')
+               help='Размер порции файла для считывания в ОЗУ, в байтах (default: %(default)s)')
     parser.add('--path', type=str, required=True,
                help='Файл для сохранения в файловом сервисе')
 
