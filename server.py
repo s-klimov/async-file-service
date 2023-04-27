@@ -2,6 +2,7 @@ import asyncio
 import cgi
 import logging.config
 import os
+import sys
 import uuid
 
 import configargparse
@@ -9,6 +10,7 @@ import sqlalchemy
 from aiofile import async_open
 from aiohttp import web
 from aiohttp.web_request import Request
+from dotenv import load_dotenv
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 
@@ -28,17 +30,19 @@ files = sqlalchemy.Table(
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
-    parser = configargparse.ArgParser(default_config_files=['settings.ini'])
+    load_dotenv()
 
-    parser.add('--host', type=str, required=False, default='localhost',
+    parser = configargparse.ArgParser()
+
+    parser.add('--host', type=str, required=False, default=os.getenv('FILE_SERVICE_HOST'),
                help='Хост файлового сервера (default: %(default)s)')
-    parser.add('--port', type=int, required=False, default='8080',
+    parser.add('--port', type=int, required=False, default=os.getenv('FILE_SERVICE_PORT'),
                help='Порт файлового сервера (default: %(default)s)')
-    parser.add('--archive_dir', type=str, required=True,
+    parser.add('--dir', type=str, required=False, default=os.getenv('FILE_SERVICE_DIR'),
                help='Папка для хранения файлов в сервисе')
-    parser.add('--database_url', type=str, required=True,
+    parser.add('--database_url', type=str, required=False, default=os.getenv('FILE_SERVICE_DATABASE_URL'),
                help='адрес базы данных сервиса')
-    parser.add('--chunk', type=int, required=True,
+    parser.add('--chunk', type=int, required=False, default=os.getenv('FILE_SERVICE_CHUNK'),
                help='размер порции файла для выгрузки из сервиса')
 
     return parser.parse_args()
@@ -59,14 +63,13 @@ async def save_file(request: Request) -> web.Response:
     _, params = cgi.parse_header(request.headers['CONTENT-DISPOSITION'])
     file_name = params['filename']
     file_id = str(uuid.uuid4())
-    file_path = os.path.join(app['archive_dir'], file_id)
+    file_path = os.path.join(app['folder'], file_id)
 
     # https://github.com/aio-libs/aiohttp-demos
     content = await request.content.read()
 
-    async with async_open(file_path, 'bw') as fh:
-        await fh.write(content)
-        await fh.flush()
+    async with async_open(file_path, 'bw') as afp:
+        await afp.write(content)
     logger.debug(f'Файл принят {file_name} и записан на диск')
 
     async with engine.begin() as conn:
@@ -87,7 +90,7 @@ async def get_file(request: Request) -> web.StreamResponse:
     """
 
     file_id = request.match_info['id']
-    folder_path = os.path.join(os.getcwd(), app['archive_dir'])
+    folder_path = os.path.join(os.getcwd(), app['folder'])
 
     if not (os.path.exists(folder_path) and os.path.isdir(folder_path)):
         logger.warning(f'Запрошена несуществующая папка {folder_path}')
@@ -101,7 +104,7 @@ async def get_file(request: Request) -> web.StreamResponse:
 
         if file is None:
             raise web.HTTPNotFound(text='Файла по указанному id не существует')
-        file_path = os.path.join(app['archive_dir'], file_id)
+        file_path = os.path.join(app['folder'], file_id)
 
     response = web.StreamResponse(
         status=200,
@@ -152,8 +155,12 @@ if __name__ == "__main__":
 
     args = get_args()
 
+    if not os.path.isdir(args.dir):
+        logger.critical(f"папка {args.dir!r} для хранения файлов не существует")
+        sys.exit(1)
+
     app = web.Application()
-    app['archive_dir'] = args.archive_dir
+    app['folder'] = args.dir
     app['chunk_size'] = args.chunk
     app.add_routes([
         web.get('/files/{id}/', get_file),

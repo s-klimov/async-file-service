@@ -6,6 +6,14 @@
 
 Для работы микросервиса нужен Python версии не ниже 3.10.  
 Для настройки локального окружения нужно установить Poetry.
+Скопируйте файл `.env.dist` с перечнем требуемых переменных окружения в `.env` и заполните его. Пример заполнения:  
+```bash
+FILE_SERVICE_HOST=localhost
+FILE_SERVICE_PORT=8080
+FILE_SERVICE_DIR=archive
+FILE_SERVICE_DATABASE_URL=sqlite+aiosqlite:///:memory:
+FILE_SERVICE_CHUNK=65_536
+```
 
 ```bash
 poetry install
@@ -13,22 +21,24 @@ poetry install
 
 ## Как запустить web-сервер
 
-```bash
-poetry run python server.py server.py [-h] --archive_dir ARCHIVE_DIR --database_url DATABASE_URL --chunk CHUNK
-```
-Параметры:
-* archive_dir - путь до папки, где микросервис будет хранить файлы. Путь должен быть существующим.
-* database_url - адрес базы данных.  
-* chunk - размер "порции", которыми сервис возвращает файлы. 
-
-Занчение параметров может быть предустановлено в файле `settings.ini`.
-
-Получить справку о параметрах:  
+Получить справку о параметрах запуска web-сервера:      
 ```bash
 python server.py -h
 ```
 
-Сервер запустится на порту 8080.
+Запустить web-сервер:   
+```bash
+poetry run python server.py [-h] [--host HOST] [--port PORT] [--dir DIR] [--database_url DATABASE_URL] [--chunk CHUNK]
+```
+Параметры:
+* host - хост файлового сервера.  
+* port - порт файлового сервера.  
+* dir - путь до папки, где микросервис будет хранить файлы. Путь должен быть существующим.
+* database_url - адрес базы данных.  
+* chunk - размер "порции", которыми сервис возвращает файлы. 
+
+Значение параметров может быть предустановлено через переменные окружения, описанные в файле `.env`.
+
 
 ## Использование микросервиса
 

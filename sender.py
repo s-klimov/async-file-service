@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 import aiohttp
 import configargparse as configargparse
 from aiofile import async_open
+from dotenv import load_dotenv
 
 logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
@@ -17,17 +18,19 @@ CHUNK_SIZE = 2 ** 16  # Размер порции файла для считыв
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
+    load_dotenv()
+
     parser = configargparse.ArgParser()
 
     parser.add('--protocol', type=str, required=False, choices=['http', 'https'], default='http',
                help='Протокол файлового сервера (default: %(default)s)')
-    parser.add('--host', type=str, required=False, default='localhost',
+    parser.add('--host', type=str, required=False, default=os.getenv('FILE_SERVICE_HOST'),
                help='Хост файлового сервера (default: %(default)s)')
-    parser.add('--port', type=int, required=False, default='8080',
+    parser.add('--port', type=int, required=False, default=os.getenv('FILE_SERVICE_PORT'),
                help='Порт файлового сервера (default: %(default)s)')
     parser.add('--url', type=str, required=False, default='files/',
                help='Урл для доступа к методу сохранения файла (default: %(default)s)')
-    parser.add('--chunk_size', type=int, required=False, default=CHUNK_SIZE,
+    parser.add('--chunk_size', type=int, required=False, default=os.getenv('FILE_SERVICE_CHUNK'),
                help='Размер порции файла для считывания в ОЗУ, в байтах (default: %(default)s)')
     parser.add('--path', type=str, required=True,
                help='Файл для сохранения в файловом сервисе')
