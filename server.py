@@ -4,9 +4,9 @@ import logging.config
 import os
 import uuid
 
-import aiofiles
 import configargparse
 import sqlalchemy
+from aiofile import async_open
 from aiohttp import web
 from aiohttp.web_request import Request
 from sqlalchemy import select
@@ -64,7 +64,7 @@ async def save_file(request: Request) -> web.Response:
     # https://github.com/aio-libs/aiohttp-demos
     content = await request.content.read()
 
-    async with aiofiles.open(file_path, 'bw') as fh:
+    async with async_open(file_path, 'bw') as fh:
         await fh.write(content)
         await fh.flush()
     logger.debug(f'Файл принят {file_name} и записан на диск')
@@ -116,7 +116,7 @@ async def get_file(request: Request) -> web.StreamResponse:
     await response.prepare(request)
 
     try:
-        async with aiofiles.open(file_path, 'rb') as f:
+        async with async_open(file_path, 'rb') as f:
             chunk = await f.read(app['chunk_size'])
 
             while chunk:

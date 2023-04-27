@@ -4,9 +4,9 @@ import os
 from typing import Generator
 from urllib.parse import urljoin
 
-import aiofiles
 import aiohttp
 import configargparse as configargparse
+from aiofile import async_open
 
 logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ async def file_sender(file_name: str, chunk_size: int) -> Generator[bytes, None,
                     chunk (bytes): часть байтового потока файла
     """
 
-    async with aiofiles.open(file_name, 'rb') as f:
+    async with async_open(file_name, 'rb') as f:
         chunk = await f.read(chunk_size)
 
         while chunk:
