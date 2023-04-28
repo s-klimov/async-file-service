@@ -7,10 +7,9 @@ from urllib.parse import urljoin
 import aiohttp
 import configargparse as configargparse
 from aiofile import async_open
+from aiologger.loggers.json import JsonLogger
 from dotenv import load_dotenv
 
-logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
-logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 2 ** 16  # Размер порции файла для считывания в ОЗУ, в байтах
 
@@ -60,6 +59,10 @@ async def file_sender(file_name: str, chunk_size: int) -> Generator[bytes, None,
 async def main() -> None:
     """Функция генерации post-запроса в адрес файлового сервиса"""
 
+    logger = JsonLogger.with_default_handlers(
+        level=logging.DEBUG,
+    )
+
     args = get_args()
 
     url = urljoin(f'{args.protocol}://{args.host}:{args.port}', args.url)
@@ -73,7 +76,9 @@ async def main() -> None:
                 headers=headers,
                 data=file_sender(file_name=args.path, chunk_size=args.chunk_size)
         ) as resp:
-            logger.info(await resp.text())
+            await logger.info(await resp.text())
+
+    await logger.shutdown()
 
 
 if __name__ == '__main__':
