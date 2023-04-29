@@ -1,0 +1,19 @@
+version: '3.7'
+
+services:
+  server:
+    build: .
+    command: poetry run python server.py
+    env_file:
+      - .env
+    environment:
+      PHOTOS_DIR: $FILE_SERVICE_DIR
+    volumes:
+      - .:/app/
+      - file_volume:/app/${FILE_SERVICE_DIR}
+    ports:
+      - 8080:8080
+    container_name: async-file-service
+
+volumes:
+  file_volume:

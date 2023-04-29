@@ -23,7 +23,7 @@ def get_args() -> configargparse.Namespace:
 
     parser.add('--protocol', type=str, required=False, choices=['http', 'https'], default='http',
                help='Протокол файлового сервера (default: %(default)s)')
-    parser.add('--host', type=str, required=False, default=os.getenv('FILE_SERVICE_HOST'),
+    parser.add('--host', type=str, required=False, default='localhost',
                help='Хост файлового сервера (default: %(default)s)')
     parser.add('--port', type=int, required=False, default=os.getenv('FILE_SERVICE_PORT'),
                help='Порт файлового сервера (default: %(default)s)')

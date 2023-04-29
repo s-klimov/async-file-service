@@ -8,7 +8,6 @@
 Для настройки локального окружения нужно установить Poetry.
 Скопируйте файл `.env.dist` с перечнем требуемых переменных окружения в `.env` и заполните его. Пример заполнения:  
 ```bash
-FILE_SERVICE_HOST=localhost
 FILE_SERVICE_PORT=8080
 FILE_SERVICE_DIR=archive
 FILE_SERVICE_DATABASE_URL=sqlite+aiosqlite:///:memory:
@@ -28,10 +27,9 @@ python server.py -h
 
 Запустить web-сервер:   
 ```bash
-poetry run python server.py [-h] [--host HOST] [--port PORT] [--dir DIR] [--database_url DATABASE_URL] [--chunk CHUNK]
+poetry run python server.py [-h] [--port PORT] [--dir DIR] [--database_url DATABASE_URL] [--chunk CHUNK]
 ```
 Параметры:
-* host - хост файлового сервера.  
 * port - порт файлового сервера.  
 * dir - путь до папки, где микросервис будет хранить файлы. Путь должен быть существующим.
 * database_url - адрес базы данных.  

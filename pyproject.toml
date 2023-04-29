@@ -4,7 +4,6 @@ version = "0.1.0"
 description = ""
 authors = ["Sergei Klimov <s.klimov@bk.ru>"]
 readme = "README.md"
-packages = [{include = "async_file_service"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
