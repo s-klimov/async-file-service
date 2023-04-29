@@ -1,6 +1,6 @@
 import asyncio
 import cgi
-import logging.config
+import logging
 import os
 import sys
 import uuid
@@ -10,12 +10,14 @@ import sqlalchemy
 from aiofile import async_open
 from aiohttp import web
 from aiohttp.web_request import Request
+from aiologger.loggers.json import JsonLogger
 from dotenv import load_dotenv
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 
-logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
-logger = logging.getLogger(__name__)
+logger = JsonLogger.with_default_handlers(
+    level=logging.DEBUG,
+)
 
 metadata = sqlalchemy.MetaData()
 engine: AsyncEngine
@@ -34,8 +36,6 @@ def get_args() -> configargparse.Namespace:
 
     parser = configargparse.ArgParser()
 
-    parser.add('--host', type=str, required=False, default=os.getenv('FILE_SERVICE_HOST'),
-               help='Хост файлового сервера (default: %(default)s)')
     parser.add('--port', type=int, required=False, default=os.getenv('FILE_SERVICE_PORT'),
                help='Порт файлового сервера (default: %(default)s)')
     parser.add('--dir', type=str, required=False, default=os.getenv('FILE_SERVICE_DIR'),
@@ -58,7 +58,7 @@ async def save_file(request: Request) -> web.Response:
                     response (aiohttp.Response): объект ответа
     """
 
-    logger.info(request.headers)
+    await logger.info(request.headers)
 
     _, params = cgi.parse_header(request.headers['CONTENT-DISPOSITION'])
     file_name = params['filename']
@@ -70,11 +70,11 @@ async def save_file(request: Request) -> web.Response:
 
     async with async_open(file_path, 'bw') as afp:
         await afp.write(content)
-    logger.debug(f'Файл принят {file_name} и записан на диск')
+    await logger.debug(f'Файл принят {file_name} и записан на диск')
 
     async with engine.begin() as conn:
         response = await conn.execute(files.insert().values(id=file_id, name=file_name))
-        logger.debug(f'Файл сохранен под id={response.inserted_primary_key[0]}')
+        await logger.debug(f'Файл сохранен под id={response.inserted_primary_key[0]}')
 
     return web.Response(status=201, reason='OK', text=response.inserted_primary_key[0])
 
@@ -93,7 +93,7 @@ async def get_file(request: Request) -> web.StreamResponse:
     folder_path = os.path.join(os.getcwd(), app['folder'])
 
     if not (os.path.exists(folder_path) and os.path.isdir(folder_path)):
-        logger.warning(f'Запрошена несуществующая папка {folder_path}')
+        await logger.warning(f'Запрошена несуществующая папка {folder_path}')
         raise web.HTTPNotFound(text='Архив не существует или был удален')
 
     async with engine.connect() as conn:
@@ -127,7 +127,7 @@ async def get_file(request: Request) -> web.StreamResponse:
                 chunk = await f.read(app['chunk_size'])
 
     except asyncio.CancelledError:
-        logger.error("Download was interrupted ")
+        await logger.error("Download was interrupted ")
 
         # отпускаем перехваченный CancelledError
         raise
@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
     try:
         asyncio.run(get_db_engine(args.database_url))
-        web.run_app(app, host=args.host, port=args.port)
+        web.run_app(app, port=args.port)
 
     except KeyboardInterrupt:
         pass
@@ -177,3 +177,5 @@ if __name__ == "__main__":
         logger.error(str(e))
     finally:
         logger.info('Работа сервера остановлена')
+
+    logger.shutdown()
