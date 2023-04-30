@@ -13,14 +13,16 @@ from aiohttp.web_request import Request
 from aiologger.loggers.json import JsonLogger
 from dotenv import load_dotenv
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
+from sqlalchemy.ext.asyncio import create_async_engine
 
 logger = JsonLogger.with_default_handlers(
     level=logging.DEBUG,
 )
 
+load_dotenv()
+
 metadata = sqlalchemy.MetaData()
-engine: AsyncEngine
+engine = create_async_engine(os.environ["FILE_SERVICE_DATABASE_URL"], echo=True)
 files = sqlalchemy.Table(
     "file",
     metadata,
@@ -32,16 +34,12 @@ files = sqlalchemy.Table(
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
-    load_dotenv()
-
     parser = configargparse.ArgParser()
 
     parser.add('--port', type=int, required=False, default=os.getenv('FILE_SERVICE_PORT'),
                help='Порт файлового сервера (default: %(default)s)')
     parser.add('--dir', type=str, required=False, default=os.getenv('FILE_SERVICE_DIR'),
                help='Папка для хранения файлов в сервисе')
-    parser.add('--database_url', type=str, required=False, default=os.getenv('FILE_SERVICE_DATABASE_URL'),
-               help='адрес базы данных сервиса')
     parser.add('--chunk', type=int, required=False, default=os.getenv('FILE_SERVICE_CHUNK'),
                help='размер порции файла для выгрузки из сервиса')
 
@@ -135,18 +133,16 @@ async def get_file(request: Request) -> web.StreamResponse:
     return response
 
 
-async def get_db_engine(database_url: str):
+async def init_db():
     """
-    Подключает движок базы данных и создает таблицу для хранения информации о файлах
+    Cоздает таблицу для хранения информации о файлах
 
             Параметры:
-                    database_url (str): адрес базы данных
+
             Возвращаемое значение:
                     None
     """
 
-    global engine
-    engine = create_async_engine(database_url, echo=True)
     async with engine.begin() as conn:
         await conn.run_sync(metadata.create_all)
 
@@ -168,7 +164,7 @@ if __name__ == "__main__":
     ])
 
     try:
-        asyncio.run(get_db_engine(args.database_url))
+        asyncio.run(init_db())
         web.run_app(app, port=args.port)
 
     except KeyboardInterrupt:
