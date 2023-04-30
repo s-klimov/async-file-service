@@ -4,6 +4,7 @@ services:
   server:
     build: .
     command: poetry run python server.py
+    restart: always
     env_file:
       - .env
     environment:
@@ -12,7 +13,7 @@ services:
       - .:/app/
       - file_volume:/app/${FILE_SERVICE_DIR}
     ports:
-      - 8080:8080
+      - ${FILE_SERVICE_PORT}:${FILE_SERVICE_PORT}
     container_name: async-file-service
 
 volumes:
