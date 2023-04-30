@@ -11,10 +11,7 @@ services:
       PHOTOS_DIR: $FILE_SERVICE_DIR
     volumes:
       - .:/app/
-      - file_volume:/app/${FILE_SERVICE_DIR}
+      - ./${FILE_SERVICE_DIR}:/app/${FILE_SERVICE_DIR}
     ports:
       - ${FILE_SERVICE_PORT}:${FILE_SERVICE_PORT}
     container_name: async-file-service
-
-volumes:
-  file_volume:
