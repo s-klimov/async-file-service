@@ -4,12 +4,12 @@ import os
 from typing import Generator
 from urllib.parse import urljoin
 
-import aiofiles
 import aiohttp
 import configargparse as configargparse
+from aiofile import async_open
+from aiologger.loggers.json import JsonLogger
+from dotenv import load_dotenv
 
-logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
-logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 2 ** 16  # Размер порции файла для считывания в ОЗУ, в байтах
 
@@ -17,17 +17,19 @@ CHUNK_SIZE = 2 ** 16  # Размер порции файла для считыв
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
+    load_dotenv()
+
     parser = configargparse.ArgParser()
 
     parser.add('--protocol', type=str, required=False, choices=['http', 'https'], default='http',
                help='Протокол файлового сервера (default: %(default)s)')
     parser.add('--host', type=str, required=False, default='localhost',
                help='Хост файлового сервера (default: %(default)s)')
-    parser.add('--port', type=int, required=False, default='8080',
+    parser.add('--port', type=int, required=False, default=os.getenv('FILE_SERVICE_PORT'),
                help='Порт файлового сервера (default: %(default)s)')
     parser.add('--url', type=str, required=False, default='files/',
                help='Урл для доступа к методу сохранения файла (default: %(default)s)')
-    parser.add('--chunk_size', type=int, required=False, default=CHUNK_SIZE,
+    parser.add('--chunk_size', type=int, required=False, default=os.getenv('FILE_SERVICE_CHUNK'),
                help='Размер порции файла для считывания в ОЗУ, в байтах (default: %(default)s)')
     parser.add('--path', type=str, required=True,
                help='Файл для сохранения в файловом сервисе')
@@ -46,7 +48,7 @@ async def file_sender(file_name: str, chunk_size: int) -> Generator[bytes, None,
                     chunk (bytes): часть байтового потока файла
     """
 
-    async with aiofiles.open(file_name, 'rb') as f:
+    async with async_open(file_name, 'rb') as f:
         chunk = await f.read(chunk_size)
 
         while chunk:
@@ -56,6 +58,10 @@ async def file_sender(file_name: str, chunk_size: int) -> Generator[bytes, None,
 
 async def main() -> None:
     """Функция генерации post-запроса в адрес файлового сервиса"""
+
+    logger = JsonLogger.with_default_handlers(
+        level=logging.DEBUG,
+    )
 
     args = get_args()
 
@@ -70,7 +76,9 @@ async def main() -> None:
                 headers=headers,
                 data=file_sender(file_name=args.path, chunk_size=args.chunk_size)
         ) as resp:
-            logger.info(await resp.text())
+            await logger.info(await resp.text())
+
+    await logger.shutdown()
 
 
 if __name__ == '__main__':
