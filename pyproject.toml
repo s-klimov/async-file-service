@@ -14,10 +14,23 @@ aiosqlite = "^0.19.0"
 aiofile = "^3.8.5"
 python-dotenv = "^1.0.0"
 aiologger = "^0.7.0"
+pytest-aiohttp = "^1.0.4"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^6.0.0"
 
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+    "integration",
+]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
 
 [build-system]
 requires = ["poetry-core"]
