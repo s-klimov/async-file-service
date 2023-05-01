@@ -21,7 +21,7 @@ flake8 = "^6.0.0"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
+addopts = "-ra -vvv"
 testpaths = [
     "tests",
     "integration",
