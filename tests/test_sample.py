@@ -1,12 +1,12 @@
 import os
-import sqlite3
 import uuid
 
 import pytest
 from aiohttp import web
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from server import get_file, save_file, metadata
+import server
+from server import get_file, save_file, metadata, app
 
 TEST_FOLDER = 'archive'
 TEST_CHUNK_SIZE = 1000
@@ -15,8 +15,6 @@ TEST_CHUNK_SIZE = 1000
 @pytest.fixture
 def cli(loop, aiohttp_client):
     app = web.Application()
-    app['folder'] = TEST_FOLDER
-    app['chunk_size'] = TEST_CHUNK_SIZE
     app.add_routes([
         web.get('/files/{id}/', get_file),
         web.post('/files/', save_file)
@@ -26,9 +24,15 @@ def cli(loop, aiohttp_client):
 
 # https://smirnov-am.github.io/pytest-testing_database/
 @pytest.fixture
-def db_engine():
+async def db_engine():
     engine = create_async_engine(os.environ["FILE_SERVICE_DATABASE_URL"], echo=True)
     yield engine
+
+
+@pytest.fixture
+async def setup_db(db_engine):
+    async with db_engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
 
 
 async def test_method_not_allowed(cli):
@@ -37,10 +41,13 @@ async def test_method_not_allowed(cli):
     assert resp.status == 405
 
 
-async def test_404(cli, db_engine):
+@pytest.mark.usefixtures("setup_db")
+async def test_404(monkeypatch, cli, db_engine):
 
-    async with db_engine.begin() as conn:
-        await conn.run_sync(metadata.create_all)
+    monkeypatch.setitem(app, 'folder', TEST_FOLDER)
+    monkeypatch.setitem(app, 'chunk_size', TEST_CHUNK_SIZE)
+
+    monkeypatch.setattr(server, "engine", db_engine)
 
     resp = await cli.get(f'/files/{uuid.uuid4()}/')
     assert resp.status == 404
