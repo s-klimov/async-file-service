@@ -1,3 +1,4 @@
+import os
 import shutil
 from pathlib import Path
 
@@ -9,21 +10,15 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from server import get_file, save_file, metadata
 
 
-TEST_FOLDER = 'test_archive'
-TEST_CHUNK_SIZE = 3
-TEST_DATABASE_URL = 'sqlite+aiosqlite:///:memory:'
+TEST_FOLDER = os.getenv('TEST_FOLDER', 'test_archive')
+TEST_CHUNK_SIZE = os.getenv('TEST_CHUNK_SIZE', 3)
+TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL', 'sqlite+aiosqlite:///:memory:')
 
 
 def pytest_sessionstart(session) -> None:
     """Создает директорию для хранения файлов в сервисе на время тестирования"""
 
     Path(TEST_FOLDER).mkdir(parents=True, exist_ok=True)
-
-
-def pytest_sessionfinish(session) -> None:
-    """Удаляет директорию, созданную для хранения файлов в сервисе на время тестирования"""
-
-    shutil.rmtree(TEST_FOLDER)
 
 
 @pytest.fixture
