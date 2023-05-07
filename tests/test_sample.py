@@ -1,44 +1,78 @@
+import hashlib
 import io
-import logging
 import os
 import uuid
 
 import pytest
-from aiohttp import web
-from aiologger.loggers.json import JsonLogger
-from sqlalchemy.ext.asyncio import create_async_engine
+from aiofile import async_open
 
 import server
-from server import get_file, save_file, metadata, app
-
-TEST_FOLDER = 'archive'
-TEST_CHUNK_SIZE = 3
+from server import app
+from tests.conftest import TEST_FOLDER, TEST_CHUNK_SIZE
 
 
-@pytest.fixture
-def cli(loop, aiohttp_client):
-    app = web.Application()
-    app.add_routes([
-        web.get('/files/{id}/', get_file),
-        web.post('/files/', save_file)
-    ])
-    return loop.run_until_complete(aiohttp_client(app))
+@pytest.mark.usefixtures("setup_db")
+async def test_save_file_success(monkeypatch, cli, db_engine):
+    """Проверяем сохранение файла. Контрольные суммы сохраняемого файла и сохраненного файла должны совпасть."""
+
+    monkeypatch.setitem(app, 'folder', TEST_FOLDER)
+    monkeypatch.setitem(app, 'chunk_size', TEST_CHUNK_SIZE)
+
+    monkeypatch.setattr(server, "engine", db_engine)
+
+    data = io.BytesIO(b"some random data")
+    md5_hash = hashlib.md5(data.read()).hexdigest()
+
+    headers = {
+        # "Transfer-Encoding": "chunked",
+        'CONTENT-DISPOSITION': 'attachment;filename=random.txt'
+    }
+
+    data.seek(0)
+    resp = await cli.post('/files/', data=data.read(), headers=headers, chunked=TEST_CHUNK_SIZE)
+    file_id = await resp.text()
+
+    assert resp.status == 201
+    assert uuid.UUID(file_id)
+
+    async with async_open(os.path.join(TEST_FOLDER, file_id), 'rb') as afp:
+        new_md5_hash = hashlib.md5(await afp.read()).hexdigest()
+    assert md5_hash == new_md5_hash
 
 
-# https://smirnov-am.github.io/pytest-testing_database/
-@pytest.fixture
-async def db_engine():
-    engine = create_async_engine(os.environ["FILE_SERVICE_DATABASE_URL"], echo=True)
-    yield engine
+@pytest.mark.usefixtures("setup_db")
+async def test_save_and_get_file_success(monkeypatch, cli, db_engine):
+    """Проверяем сохранение и получение одного и того же файла. Контрольные суммы сохраняемого файла и
+    полученного файла должны совпасть"""
 
+    monkeypatch.setitem(app, 'folder', TEST_FOLDER)
+    monkeypatch.setitem(app, 'chunk_size', TEST_CHUNK_SIZE)
 
-@pytest.fixture
-async def setup_db(db_engine):
-    async with db_engine.begin() as conn:
-        await conn.run_sync(metadata.create_all)
+    monkeypatch.setattr(server, "engine", db_engine)
+
+    data = io.BytesIO(b"some random data")
+    md5_hash = hashlib.md5(data.read()).hexdigest()
+
+    headers = {
+        # "Transfer-Encoding": "chunked",
+        'CONTENT-DISPOSITION': 'attachment;filename=random.txt'
+    }
+
+    data.seek(0)
+    resp = await cli.post('/files/', data=data.read(), headers=headers, chunked=TEST_CHUNK_SIZE)
+    file_id = await resp.text()
+
+    assert resp.status == 201
+    assert uuid.UUID(file_id)
+
+    resp = await cli.get(f'/files/{file_id}/')
+    content = await resp.text()
+    new_md5_hash = hashlib.md5(str.encode(content)).hexdigest()
+    assert md5_hash == new_md5_hash
 
 
 async def test_method_not_allowed(cli):
+    """Проверяем проект на ожидаемое отсутствие метода get по урлу для сохранения файла"""
 
     resp = await cli.get('/files/')
     assert resp.status == 405
@@ -46,6 +80,7 @@ async def test_method_not_allowed(cli):
 
 @pytest.mark.usefixtures("setup_db")
 async def test_404(monkeypatch, cli, db_engine):
+    """Проверяем проект на ожидаемое отсутствие файла при попытке запросить его по случайному id."""
 
     monkeypatch.setitem(app, 'folder', TEST_FOLDER)
     monkeypatch.setitem(app, 'chunk_size', TEST_CHUNK_SIZE)
@@ -54,25 +89,3 @@ async def test_404(monkeypatch, cli, db_engine):
 
     resp = await cli.get(f'/files/{uuid.uuid4()}/')
     assert resp.status == 404
-
-
-@pytest.mark.usefixtures("setup_db")
-async def test_save_file_success(monkeypatch, cli, db_engine):
-
-    monkeypatch.setitem(app, 'folder', TEST_FOLDER)
-    monkeypatch.setitem(app, 'chunk_size', TEST_CHUNK_SIZE)
-
-    monkeypatch.setattr(server, "engine", db_engine)
-
-    data = io.BytesIO(b"some random data")
-
-    headers = {
-        # "Transfer-Encoding": "chunked",
-        'CONTENT-DISPOSITION': 'attachment;filename=random.txt'
-    }
-
-    resp = await cli.post('/files/', data=data, headers=headers, chunked=TEST_CHUNK_SIZE)
-    file_id = await resp.text()
-
-    assert resp.status == 201
-    assert uuid.UUID(file_id)

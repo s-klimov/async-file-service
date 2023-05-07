@@ -33,6 +33,7 @@ files = sqlalchemy.Table(
 
 app = web.Application()
 
+
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
@@ -156,7 +157,6 @@ if __name__ == "__main__":
     if not os.path.isdir(args.dir):
         logger.critical(f"папка {args.dir!r} для хранения файлов не существует")
         sys.exit(1)
-
 
     app['folder'] = args.dir
     app['chunk_size'] = args.chunk
