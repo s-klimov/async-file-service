@@ -31,6 +31,9 @@ files = sqlalchemy.Table(
 )
 
 
+app = web.Application()
+
+
 def get_args() -> configargparse.Namespace:
     """Получаем аргументы из командной строки"""
 
@@ -63,11 +66,18 @@ async def save_file(request: Request) -> web.Response:
     file_id = str(uuid.uuid4())
     file_path = os.path.join(app['folder'], file_id)
 
-    # https://github.com/aio-libs/aiohttp-demos
-    content = await request.content.read()
-
     async with async_open(file_path, 'bw') as afp:
-        await afp.write(content)
+        # https://docs.aiohttp.org/en/stable/streams.html#asynchronous-iteration-support
+        # Выполняет итерацию по блокам данных в порядке их ввода в поток
+        async for data in request.content.iter_any():
+            await afp.write(data)
+
+    # вариант с чтением из потока всего файла целиком https://github.com/aio-libs/aiohttp-demos
+    # content = await request.content.read()
+    #
+    # async with async_open(file_path, 'bw') as afp:
+    #     await afp.write(content)
+
     await logger.debug(f'Файл принят {file_name} и записан на диск')
 
     async with engine.begin() as conn:
@@ -155,14 +165,12 @@ if __name__ == "__main__":
         logger.critical(f"папка {args.dir!r} для хранения файлов не существует")
         sys.exit(1)
 
-    app = web.Application()
     app['folder'] = args.dir
     app['chunk_size'] = args.chunk
     app.add_routes([
         web.get('/files/{id}/', get_file),
         web.post('/files/', save_file)
     ])
-
     try:
         asyncio.run(init_db())
         web.run_app(app, port=args.port)
